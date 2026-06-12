@@ -2,4 +2,6 @@ Struggling to beat Wordle's trickiest traps? Meet **Wordver**, a cutting-edge, i
 
 What makes Wordver truly remarkable is its frictionless, interactive input matrix. You can comfortably type out your letters, click the tiles to match your real-time Wordle color feedback (Grey, Yellow, or Green), and let the algorithm do the heavy lifting. The engine immediately flags absolute solutions, calculates maximum cluster sizes, and profiles trap-resistant paths to guarantee your victory streak stays completely unbroken. Whether you are looking to study the deep mathematics behind optimal word selection or simply want a flawless mechanical companion to conquer the daily puzzle, Wordver provides the raw computational power and elegant interface to elevate your game.
 
-NOTE : Word list of solution.txt and allowed.txt might change overtime, feel free to change it yourself.
+NOTE : -Word list of solution.txt and allowed.txt might change overtime, feel free to change it yourself.
+       -This solver will suggest CRANE as the first guess. However, if you want to make your first guess with other words, feel free to delete the word using backspace, then enter your new
+        word.

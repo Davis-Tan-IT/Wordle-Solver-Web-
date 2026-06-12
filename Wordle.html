@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wordver // Anti-Bottleneck Wordle Solver</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0b0f19; }
+        .heading-font { font-family: 'Space Grotesk', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+    </style>
+</head>
+<body class="text-gray-100 min-h-screen flex flex-col justify-between antialiased">
+
+    <header class="border-b border-gray-800 bg-gray-900/50 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
+        <div class="max-w-5xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="bg-violet-600 text-white p-2 rounded-xl font-bold tracking-wider text-xl heading-font shadow-lg shadow-violet-600/20">W</div>
+                <h1 class="text-2xl font-bold tracking-tight heading-font bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">WORDVER</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-[10px] font-bold px-2 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 tracking-wider uppercase">Hard Mode</span>
+                <span id="statusBadge" class="text-xs font-semibold px-3 py-1.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 tracking-wide uppercase">
+                    Awaiting Word Lists
+                </span>
+                <button id="resetBtn" class="bg-gray-800 hover:bg-gray-700 text-gray-200 px-4 py-2 rounded-xl font-medium transition duration-200 text-sm flex items-center space-x-2 border border-gray-700 cursor-pointer">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18" /></svg>
+                    <span>Reset Matrix</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-5xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+        
+        <section class="md:col-span-7 bg-gray-900/40 border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col items-center">
+            <div class="w-full max-w-[330px] bg-gray-900/80 border border-gray-800 rounded-xl p-3 mb-6 space-y-2">
+                <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 text-center mb-1">Load Local Dictionaries</p>
+                <div class="flex space-x-2">
+                    <label class="w-1/2 flex flex-col items-center justify-center py-2 px-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg cursor-pointer transition text-xs font-medium text-gray-200 text-center">
+                        <span id="solFileLabel" class="truncate max-w-full">📄 solution.txt</span>
+                        <input type="file" id="solFileInput" accept=".txt" class="hidden">
+                    </label>
+                    <label class="w-1/2 flex flex-col items-center justify-center py-2 px-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg cursor-pointer transition text-xs font-medium text-gray-200 text-center">
+                        <span id="allFileLabel" class="truncate max-w-full">📄 allowed.txt</span>
+                        <input type="file" id="allFileInput" accept=".txt" class="hidden">
+                    </label>
+                </div>
+            </div>
+
+            <div class="mb-4 text-center">
+                <p class="text-xs text-gray-400 uppercase tracking-widest font-semibold mb-1">Interactive Input Matrix</p>
+                <p class="text-sm text-gray-500">Type letters on keyboard. Click tiles to change color.</p>
+            </div>
+
+            <div id="gridContainer" class="grid grid-cols-5 gap-2 w-full max-w-[330px] h-[400px]"></div>
+
+            <div class="mt-6 w-full max-w-[330px]">
+                <button id="submitGuessBtn" class="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-violet-600/20 transition duration-200 flex justify-center items-center space-x-2 cursor-pointer">
+                    <span>Lock Guess & Compute</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
+                </button>
+            </div>
+        </section>
+
+        <section class="md:col-span-5 space-y-6">
+            <div class="bg-gradient-to-br from-violet-950/40 to-slate-900/40 border border-violet-500/20 rounded-2xl p-5 shadow-xl relative overflow-hidden backdrop-blur-sm">
+                <h3 class="text-xs uppercase tracking-widest font-bold text-violet-400 mb-2">Optimal Recommendation</h3>
+                <div class="text-4xl font-bold tracking-widest heading-font text-white mb-2" id="optimalGuessDisplay">-----</div>
+                <p class="text-sm text-gray-300 leading-relaxed" id="instructionText">Please upload your dictionary files to initialize the anti-bottleneck evaluation pass.</p>
+            </div>
+
+            <div id="analyticsMetricsGroup" class="grid grid-cols-2 gap-4">
+                <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
+                    <span class="block text-xs text-gray-400 font-medium uppercase tracking-wider mb-1">Solutions Pool</span>
+                    <div class="text-2xl font-bold text-white heading-font" id="poolCountDisplay">0</div>
+                    <div class="text-[10px] text-gray-500 mt-1">Viable choices remaining</div>
+                </div>
+                <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
+                    <span class="block text-xs text-gray-400 font-medium uppercase tracking-wider mb-1">Worst-Case Peak</span>
+                    <div class="text-2xl font-bold text-amber-400 heading-font" id="worstCaseDisplay">0 <span class="text-xs text-gray-500 font-normal">words</span></div>
+                    <div class="text-[10px] text-gray-500 mt-1">Max cluster size group</div>
+                </div>
+            </div>
+
+            <div id="candidatesContainerCard" class="bg-gray-900/40 border border-gray-800 rounded-2xl p-5 shadow-xl flex flex-col h-64">
+                <h3 class="text-xs uppercase tracking-widest font-bold text-gray-400 mb-3">Safest Anti-Trap Profiling</h3>
+                <div id="candidateList" class="overflow-y-auto space-y-2 pr-1 flex-grow"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="border-t border-gray-800 bg-gray-900/20 py-4 px-6 text-center text-xs text-gray-500">
+        Wordver Engine • Hybrid Minimax Worst-Case Optimization Loop
+    </footer>
+
+    <script>
+        let W_sol_base = [];
+        let W_all_base = [];
+        let W_sol = [];
+        let W_all = []; 
+
+        let currentTurn = 0;
+        const maxTurns = 6;
+        const wordLength = 5;
+
+        const globalPatternBuckets = new Array(243).fill(0);
+
+        const gridContainer = document.getElementById('gridContainer');
+        const submitGuessBtn = document.getElementById('submitGuessBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const optimalGuessDisplay = document.getElementById('optimalGuessDisplay');
+        const instructionText = document.getElementById('instructionText');
+        const poolCountDisplay = document.getElementById('poolCountDisplay');
+        const worstCaseDisplay = document.getElementById('worstCaseDisplay');
+        const candidateList = document.getElementById('candidateList');
+        const statusBadge = document.getElementById('statusBadge');
+        
+        const analyticsMetricsGroup = document.getElementById('analyticsMetricsGroup');
+        const candidatesContainerCard = document.getElementById('candidatesContainerCard');
+
+        const solFileInput = document.getElementById('solFileInput');
+        const allFileInput = document.getElementById('allFileInput');
+        const solFileLabel = document.getElementById('solFileLabel');
+        const allFileLabel = document.getElementById('allFileLabel');
+
+        let matrixState = Array.from({ length: maxTurns }, () => 
+            Array.from({ length: wordLength }, () => ({ letter: '', color: 0 }))
+        );
+
+        solFileInput.addEventListener('change', (e) => handleFileProcessing(e, 'solutions'));
+        allFileInput.addEventListener('change', (e) => handleFileProcessing(e, 'allowed'));
+
+        function handleFileProcessing(event, type) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const lines = e.target.result.split(/\r?\n/).map(w => w.trim().toLowerCase()).filter(w => w.length === 5);
+                if (type === 'solutions') {
+                    W_sol_base = lines;
+                    solFileLabel.innerText = `✓ (${lines.length})`;
+                    solFileLabel.parentElement.classList.add('border-emerald-500/30', 'bg-emerald-500/10', 'text-emerald-400');
+                } else {
+                    W_all_base = lines;
+                    allFileLabel.innerText = `✓ (${lines.length})`;
+                    allFileLabel.parentElement.classList.add('border-emerald-500/30', 'bg-emerald-500/10', 'text-emerald-400');
+                }
+                if (W_sol_base.length > 0 && W_all_base.length > 0) {
+                    resetGame();
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function createGrid() {
+            gridContainer.innerHTML = '';
+            for (let r = 0; r < maxTurns; r++) {
+                for (let c = 0; c < wordLength; c++) {
+                    const tile = document.createElement('div');
+                    tile.id = `tile-${r}-${c}`;
+                    tile.className = `w-full h-full flex items-center justify-center text-xl font-bold uppercase border-2 border-gray-800 rounded-xl bg-gray-950/60 select-none transition-all duration-150 cursor-pointer text-gray-500`;
+                    tile.addEventListener('click', () => handleTileClick(r, c));
+                    gridContainer.appendChild(tile);
+                }
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (W_sol.length === 0 || currentTurn >= maxTurns) return;
+            if (e.key === 'Backspace') {
+                deleteLetter();
+            } else if (e.key === 'Enter') {
+                processActiveTurn();
+            } else if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+                insertLetter(e.key.toLowerCase());
+            }
+        });
+
+        function insertLetter(char) {
+            for (let c = 0; c < wordLength; c++) {
+                if (matrixState[currentTurn][c].letter === '') {
+                    matrixState[currentTurn][c].letter = char;
+                    const tile = document.getElementById(`tile-${currentTurn}-${c}`);
+                    tile.innerText = char;
+                    tile.classList.remove('text-gray-500', 'border-gray-800');
+                    tile.classList.add('text-white', 'border-gray-600', 'scale-[1.02]');
+                    break;
+                }
+            }
+        }
+
+        function deleteLetter() {
+            for (let c = wordLength - 1; c >= 0; c--) {
+                if (matrixState[currentTurn][c].letter !== '') {
+                    matrixState[currentTurn][c].letter = '';
+                    matrixState[currentTurn][c].color = 0;
+                    const tile = document.getElementById(`tile-${currentTurn}-${c}`);
+                    tile.innerText = '';
+                    tile.className = `w-full h-full flex items-center justify-center text-xl font-bold uppercase border-2 border-gray-800 rounded-xl bg-gray-950/60 select-none transition-all duration-150 cursor-pointer text-gray-500`;
+                    break;
+                }
+            }
+        }
+
+        function handleTileClick(row, col) {
+            if (row !== currentTurn || matrixState[row][col].letter === '') return;
+            const nextState = (matrixState[row][col].color + 1) % 3;
+            matrixState[row][col].color = nextState;
+            updateTileVisual(row, col, nextState);
+        }
+
+        function updateTileVisual(row, col, state) {
+            const tile = document.getElementById(`tile-${row}-${col}`);
+            tile.classList.remove('bg-gray-950/60', 'bg-gray-700', 'bg-amber-500', 'bg-emerald-600', 'border-gray-800', 'border-gray-600', 'border-amber-600', 'border-emerald-700');
+            if (state === 0) tile.classList.add('bg-gray-700', 'border-gray-600');
+            else if (state === 1) tile.classList.add('bg-amber-500', 'border-amber-600');
+            else if (state === 2) tile.classList.add('bg-emerald-600', 'border-emerald-700');
+        }
+
+        function calculateFeedbackPattern(guess, solution) {
+            let matches = new Array(5).fill(0);
+            let solLetterCounts = {};
+            for (let i = 0; i < 5; i++) {
+                if (guess[i] === solution[i]) matches[i] = 2;
+                else solLetterCounts[solution[i]] = (solLetterCounts[solution[i]] || 0) + 1;
+            }
+            for (let i = 0; i < 5; i++) {
+                if (matches[i] !== 2) {
+                    const char = guess[i];
+                    if (solLetterCounts[char] && solLetterCounts[char] > 0) {
+                        matches[i] = 1;
+                        solLetterCounts[char]--;
+                    }
+                }
+            }
+            return matches[0] * 81 + matches[1] * 27 + matches[2] * 9 + matches[3] * 3 + matches[4];
+        }
+
+        function evaluateWordMetrics(guess, solutionsPool) {
+            globalPatternBuckets.fill(0); 
+            const total = solutionsPool.length;
+            
+            for (let i = 0; i < total; i++) {
+                const pattern = calculateFeedbackPattern(guess, solutionsPool[i]);
+                globalPatternBuckets[pattern]++;
+            }
+
+            let maxBucketSize = 0;
+            let entropy = 0;
+
+            for (let i = 0; i < 243; i++) {
+                const size = globalPatternBuckets[i];
+                if (size > 0) {
+                    if (size > maxBucketSize) maxBucketSize = size;
+                    const p = size / total;
+                    entropy -= p * Math.log2(p);
+                }
+            }
+            return { maxBucketSize, entropy };
+        }
+
+        function filterPool(solutionsPool, guess, exactPatternCode) {
+            return solutionsPool.filter(sol => calculateFeedbackPattern(guess, sol) === exactPatternCode);
+        }
+
+        function computeBestGuesses() {
+            if (W_sol.length === 0) return;
+
+            if (currentTurn === 0) {
+                analyticsMetricsGroup.classList.add('hidden');
+                candidatesContainerCard.classList.add('hidden');
+                
+                optimalGuessDisplay.innerText = "CRANE";
+                instructionText.innerHTML = `Enter <strong class="text-violet-400 tracking-wider">CRANE</strong> as your starting optimal baseline. Match your colors, then click Lock Guess & Compute.`;
+                
+                populateActiveRow("crane");
+                
+                statusBadge.innerText = "Ready";
+                statusBadge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 tracking-wide uppercase";
+                return;
+            }
+
+            analyticsMetricsGroup.classList.remove('hidden');
+            candidatesContainerCard.classList.remove('hidden');
+
+            statusBadge.innerText = "Analyzing Strategy...";
+            statusBadge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 tracking-wide uppercase";
+
+            setTimeout(() => {
+                if (W_sol.length === 1) {
+                    const target = W_sol[0].toUpperCase();
+                    optimalGuessDisplay.innerText = target;
+                    instructionText.innerHTML = `Absolute solution confirmed. Play <strong class="text-emerald-400">${target}</strong> to complete the matrix.`;
+                    poolCountDisplay.innerText = "1";
+                    worstCaseDisplay.innerText = "1";
+                    candidateList.innerHTML = `<div class="text-sm bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl text-emerald-400 font-semibold flex justify-between"><span>${target}</span><span>Target Lock</span></div>`;
+                    statusBadge.innerText = "Solved";
+                    statusBadge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 tracking-wide uppercase";
+                    return;
+                }
+
+                let evaluationPool = W_sol;
+                if (W_sol.length <= 150 && W_all.length > 0) {
+                    const prevTurnIdx = currentTurn - 1;
+                    let lastGuess = "";
+                    let lastPatternCode = 0;
+                    for (let c = 0; c < wordLength; c++) {
+                        lastGuess += matrixState[prevTurnIdx][c].letter;
+                        lastPatternCode += matrixState[prevTurnIdx][c].color * Math.pow(3, 4 - c);
+                    }
+                    evaluationPool = W_all.filter(word => calculateFeedbackPattern(lastGuess, word) === lastPatternCode);
+                }
+
+                let rankings = [];
+                const limit = evaluationPool.length;
+
+                for (let i = 0; i < limit; i++) {
+                    const word = evaluationPool[i];
+                    const metrics = evaluateWordMetrics(word, W_sol);
+                    const isViableSolution = W_sol.includes(word);
+
+                    rankings.push({ 
+                        word, 
+                        maxBucket: metrics.maxBucketSize, 
+                        entropy: metrics.entropy,
+                        isSol: isViableSolution
+                    });
+                }
+
+                rankings.sort((a, b) => {
+                    if (a.maxBucket !== b.maxBucket) return a.maxBucket - b.maxBucket;
+                    if (b.entropy !== a.entropy) return b.entropy - a.entropy;
+                    return b.isSol - a.isSol;
+                });
+
+                renderRankings(rankings.slice(0, 20));
+            }, 30);
+        }
+
+        function renderRankings(topRankings) {
+            if (topRankings.length === 0) return;
+
+            const absoluteBest = topRankings[0];
+            const bestWordUpper = absoluteBest.word.toUpperCase();
+            
+            optimalGuessDisplay.innerText = bestWordUpper;
+            poolCountDisplay.innerText = W_sol.length.toLocaleString();
+            worstCaseDisplay.innerText = absoluteBest.maxBucket;
+            
+            instructionText.innerHTML = `Play <strong class="text-violet-400 tracking-wider">${bestWordUpper}</strong>. In the absolute worst-case scenario, this choice keeps your remaining possibilities capped at a maximum of <span class="text-amber-400 font-semibold">${absoluteBest.maxBucket}</span> choices.`;
+
+            candidateList.innerHTML = '';
+            topRankings.forEach((cand, idx) => {
+                const div = document.createElement('div');
+                div.className = `flex justify-between items-center text-sm p-2.5 rounded-xl border border-gray-800/80 bg-gray-900/20 transition hover:bg-gray-800/40 cursor-pointer`;
+                
+                const badgeClass = cand.isSol 
+                    ? 'bg-violet-500/10 text-violet-400' 
+                    : 'bg-amber-500/10 text-amber-400 border border-amber-500/10';
+                const badgeText = cand.isSol ? 'Sol' : 'Burn';
+
+                div.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <span class="text-gray-500 font-mono text-xs w-4">${idx + 1}</span>
+                        <span class="font-bold tracking-wider text-white uppercase">${cand.word}</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded ${badgeClass} font-medium">${badgeText}</span>
+                    </div>
+                    <div class="font-mono text-xs text-gray-400">Worst Case Peak: ${cand.maxBucket} words</div>
+                `;
+                div.addEventListener('click', () => populateActiveRow(cand.word));
+                candidateList.appendChild(div);
+            });
+
+            statusBadge.innerText = "Ready";
+            statusBadge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 tracking-wide uppercase";
+        }
+
+        function populateActiveRow(word) {
+            for(let c=0; c<wordLength; c++) {
+                matrixState[currentTurn][c].letter = '';
+                const tile = document.getElementById(`tile-${currentTurn}-${c}`);
+                tile.innerText = '';
+                tile.className = `w-full h-full flex items-center justify-center text-xl font-bold uppercase border-2 border-gray-800 rounded-xl bg-gray-950/60 select-none transition-all duration-150 cursor-pointer text-gray-500`;
+            }
+            for(let i=0; i<word.length; i++) insertLetter(word[i]);
+        }
+
+        function processActiveTurn() {
+            let compiledGuess = "";
+            let generatedPatternCode = 0;
+
+            for (let c = 0; c < wordLength; c++) {
+                const cell = matrixState[currentTurn][c];
+                if (cell.letter === '') {
+                    alert("Please fill in a full 5-letter word in the current row before locking.");
+                    return;
+                }
+                compiledGuess += cell.letter;
+            }
+
+            if (currentTurn > 0) {
+                const prevTurnIdx = currentTurn - 1;
+                let lastGuess = "";
+                let expectedPatternCode = 0;
+
+                for (let c = 0; c < wordLength; c++) {
+                    lastGuess += matrixState[prevTurnIdx][c].letter;
+                    expectedPatternCode += matrixState[prevTurnIdx][c].color * Math.pow(3, 4 - c);
+                }
+
+                if (calculateFeedbackPattern(lastGuess, compiledGuess) !== expectedPatternCode) {
+                    alert("Hard Mode Error: Your guess must use all confirmed hints from the previous turn!");
+                    return;
+                }
+            }
+
+            for (let c = 0; c < wordLength; c++) {
+                const multiplier = Math.pow(3, 4 - c);
+                generatedPatternCode += matrixState[currentTurn][c].color * multiplier;
+            }
+
+            W_sol = filterPool(W_sol, compiledGuess, generatedPatternCode);
+
+            if (generatedPatternCode === 242) { 
+                statusBadge.innerText = "Victory";
+                statusBadge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-500 text-black tracking-wide uppercase";
+                optimalGuessDisplay.innerText = compiledGuess.toUpperCase();
+                instructionText.innerHTML = "Puzzle solved successfully!";
+                return;
+            }
+
+            currentTurn++;
+            if (currentTurn >= maxTurns) {
+                statusBadge.innerText = "Game Over";
+                return;
+            }
+
+            computeBestGuesses();
+        }
+
+        function resetGame() {
+            if (W_sol_base.length === 0) return;
+            W_sol = [...W_sol_base];
+            W_all = [...W_all_base];
+            currentTurn = 0;
+            matrixState = Array.from({ length: maxTurns }, () => Array.from({ length: wordLength }, () => ({ letter: '', color: 0 })));
+            createGrid();
+            computeBestGuesses();
+        }
+
+        submitGuessBtn.addEventListener('click', processActiveTurn);
+        resetBtn.addEventListener('click', resetGame);
+        createGrid();
+    </script>
+</body>
+</html>

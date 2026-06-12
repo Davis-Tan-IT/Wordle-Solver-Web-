@@ -5,3 +5,4 @@ What makes Wordver truly remarkable is its frictionless, interactive input matri
 NOTE : -Word list of solution.txt and allowed.txt might change overtime, feel free to change it yourself.
        -This solver will suggest CRANE as the first guess. However, if you want to make your first guess with other words, feel free to delete the word using backspace, then enter your new
         word.
+       -This solver is designed for hard mode, which means it will strictly follows the color instruction.

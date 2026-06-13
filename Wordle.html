@@ -185,6 +185,7 @@
         });
 
         function insertLetter(char) {
+            if (currentTurn >= maxTurns) return;
             for (let c = 0; c < wordLength; c++) {
                 if (matrixState[currentTurn][c].letter === '') {
                     matrixState[currentTurn][c].letter = char;
@@ -198,6 +199,7 @@
         }
 
         function deleteLetter() {
+            if (currentTurn >= maxTurns) return;
             for (let c = wordLength - 1; c >= 0; c--) {
                 if (matrixState[currentTurn][c].letter !== '') {
                     matrixState[currentTurn][c].letter = '';
@@ -307,8 +309,11 @@
                     return;
                 }
 
+                const remainingTurns = maxTurns - currentTurn;
+
                 let evaluationPool = W_sol;
-                if (W_sol.length <= 150 && W_all.length > 0) {
+                // Only look for compliant burner items if we actually have turns left to spend information
+                if (remainingTurns > 1 && W_sol.length <= 150 && W_all.length > 0) {
                     const prevTurnIdx = currentTurn - 1;
                     let lastGuess = "";
                     let lastPatternCode = 0;
@@ -336,6 +341,12 @@
                 }
 
                 rankings.sort((a, b) => {
+                    // CRITICAL HARD-MODE ENDGAME OVERRIDE:
+                    // If this is our final guess block, sorting parameters prioritizing burner items is suicidal.
+                    // Force actual remaining solution hits to match 100% urgency weights.
+                    if (remainingTurns === 1) {
+                        if (a.isSol !== b.isSol) return b.isSol - a.isSol;
+                    }
                     if (a.maxBucket !== b.maxBucket) return a.maxBucket - b.maxBucket;
                     if (b.entropy !== a.entropy) return b.entropy - a.entropy;
                     return b.isSol - a.isSol;
@@ -355,7 +366,12 @@
             poolCountDisplay.innerText = W_sol.length.toLocaleString();
             worstCaseDisplay.innerText = absoluteBest.maxBucket;
             
-            instructionText.innerHTML = `Play <strong class="text-violet-400 tracking-wider">${bestWordUpper}</strong>. In the absolute worst-case scenario, this choice keeps your remaining possibilities capped at a maximum of <span class="text-amber-400 font-semibold">${absoluteBest.maxBucket}</span> choices.`;
+            const remainingTurns = maxTurns - currentTurn;
+            if (remainingTurns === 1) {
+                instructionText.innerHTML = `CRITICAL TURN! Play <strong class="text-rose-400 tracking-wider">${bestWordUpper}</strong>. Information splits are useless now; you must attempt to direct-hit a remaining pool solution.`;
+            } else {
+                instructionText.innerHTML = `Play <strong class="text-violet-400 tracking-wider">${bestWordUpper}</strong>. In the absolute worst-case scenario, this choice keeps your remaining possibilities capped at a maximum of <span class="text-amber-400 font-semibold">${absoluteBest.maxBucket}</span> choices.`;
+            }
 
             candidateList.innerHTML = '';
             topRankings.forEach((cand, idx) => {
@@ -379,11 +395,14 @@
                 candidateList.appendChild(div);
             });
 
-            statusBadge.innerText = "Ready";
-            statusBadge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 tracking-wide uppercase";
+            statusBadge.innerText = remainingTurns === 1 ? "Final Guess Warning" : "Ready";
+            statusBadge.className = remainingTurns === 1 
+                ? "text-xs font-semibold px-3 py-1.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 tracking-wide uppercase animate-pulse"
+                : "text-xs font-semibold px-3 py-1.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 tracking-wide uppercase";
         }
 
         function populateActiveRow(word) {
+            if (currentTurn >= maxTurns) return;
             for(let c=0; c<wordLength; c++) {
                 matrixState[currentTurn][c].letter = '';
                 const tile = document.getElementById(`tile-${currentTurn}-${c}`);
@@ -394,6 +413,8 @@
         }
 
         function processActiveTurn() {
+            if (currentTurn >= maxTurns) return;
+
             let compiledGuess = "";
             let generatedPatternCode = 0;
 
@@ -434,12 +455,16 @@
                 statusBadge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-500 text-black tracking-wide uppercase";
                 optimalGuessDisplay.innerText = compiledGuess.toUpperCase();
                 instructionText.innerHTML = "Puzzle solved successfully!";
+                currentTurn = maxTurns; // Halts input triggers cleanly
                 return;
             }
 
             currentTurn++;
             if (currentTurn >= maxTurns) {
                 statusBadge.innerText = "Game Over";
+                statusBadge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-red-500 text-white tracking-wide uppercase";
+                optimalGuessDisplay.innerText = "-----";
+                instructionText.innerHTML = `Matrix exhausted. Missing target word variant. Pool remaining options count was: ${W_sol.length}`;
                 return;
             }
 

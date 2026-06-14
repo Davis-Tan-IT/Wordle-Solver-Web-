@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wordver // Anti-Bottleneck Wordle Solver</title>
+    <title>Wordver // Deep Recursive Wordle Solver</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght=400;500;600;700&family=Space+Grotesk:wght=500;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0b0f19; }
         .heading-font { font-family: 'Space Grotesk', sans-serif; }
@@ -26,7 +26,7 @@
                 <h1 class="text-2xl font-bold tracking-tight heading-font bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">WORDVER</h1>
             </div>
             <div class="flex items-center space-x-4">
-                <span class="text-[10px] font-bold px-2 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 tracking-wider uppercase">Hard Mode</span>
+                <span class="text-[10px] font-bold px-2 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 tracking-wider uppercase">Deep Look-Ahead</span>
                 <span id="statusBadge" class="text-xs font-semibold px-3 py-1.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 tracking-wide uppercase">
                     Awaiting Word Lists
                 </span>
@@ -74,7 +74,7 @@
             <div class="bg-gradient-to-br from-violet-950/40 to-slate-900/40 border border-violet-500/20 rounded-2xl p-5 shadow-xl relative overflow-hidden backdrop-blur-sm">
                 <h3 class="text-xs uppercase tracking-widest font-bold text-violet-400 mb-2">Optimal Recommendation</h3>
                 <div class="text-4xl font-bold tracking-widest heading-font text-white mb-2" id="optimalGuessDisplay">-----</div>
-                <p class="text-sm text-gray-300 leading-relaxed" id="instructionText">Please upload your dictionary files to initialize the anti-bottleneck evaluation pass.</p>
+                <p class="text-sm text-gray-300 leading-relaxed" id="instructionText">Please upload your dictionary files to initialize the deep evaluation pass.</p>
             </div>
 
             <div id="analyticsMetricsGroup" class="grid grid-cols-2 gap-4">
@@ -84,9 +84,9 @@
                     <div class="text-[10px] text-gray-500 mt-1">Viable choices remaining</div>
                 </div>
                 <div class="bg-gray-900/40 border border-gray-800 rounded-xl p-4">
-                    <span class="block text-xs text-gray-400 font-medium uppercase tracking-wider mb-1">Worst-Case Peak</span>
-                    <div class="text-2xl font-bold text-amber-400 heading-font" id="worstCaseDisplay">0 <span class="text-xs text-gray-500 font-normal">words</span></div>
-                    <div class="text-[10px] text-gray-500 mt-1">Max cluster size group</div>
+                    <span class="block text-xs text-gray-400 font-medium uppercase tracking-wider mb-1">Max Turn Cost</span>
+                    <div class="text-2xl font-bold text-amber-400 heading-font" id="worstCaseDisplay">0 <span class="text-xs text-gray-500 font-normal">steps</span></div>
+                    <div class="text-[10px] text-gray-500 mt-1" id="metricsSubtext">Max cluster size group</div>
                 </div>
             </div>
 
@@ -98,7 +98,7 @@
     </main>
 
     <footer class="border-t border-gray-800 bg-gray-900/20 py-4 px-6 text-center text-xs text-gray-500">
-        Wordver Engine • Hybrid Minimax Worst-Case Optimization Loop
+        Wordver Engine • Hybrid Recursive Game Tree Optimisation Loop
     </footer>
 
     <script>
@@ -120,6 +120,7 @@
         const instructionText = document.getElementById('instructionText');
         const poolCountDisplay = document.getElementById('poolCountDisplay');
         const worstCaseDisplay = document.getElementById('worstCaseDisplay');
+        const metricsSubtext = document.getElementById('metricsSubtext');
         const candidateList = document.getElementById('candidateList');
         const statusBadge = document.getElementById('statusBadge');
         
@@ -269,6 +270,126 @@
             return { maxBucketSize, entropy };
         }
 
+        // UPDATE 1: Positional Letter Frequency Matrix Constructor
+        function calculatePositionalScore(word, solutionsPool) {
+            const matrix = Array.from({ length: 5 }, () => Array(26).fill(0));
+            const totalWords = solutionsPool.length;
+
+            for (let i = 0; i < totalWords; i++) {
+                const sol = solutionsPool[i];
+                for (let pos = 0; pos < 5; pos++) {
+                    const charCode = sol.charCodeAt(pos) - 97; 
+                    if (charCode >= 0 && charCode < 26) {
+                        matrix[pos][charCode]++;
+                    }
+                }
+            }
+
+            let score = 0;
+            for (let pos = 0; pos < 5; pos++) {
+                const charCode = word.charCodeAt(pos) - 97;
+                if (charCode >= 0 && charCode < 26) {
+                    score += matrix[pos][charCode];
+                }
+            }
+            return score;
+        }
+
+        // NEW COMPONENT: Global Letter Pool Weight Calculator (Absolute Safety Filter)
+        function calculateGlobalScore(word, solutionsPool) {
+            const globalCounts = Array(26).fill(0);
+            const totalWords = solutionsPool.length;
+
+            for (let i = 0; i < totalWords; i++) {
+                const sol = solutionsPool[i];
+                for (let pos = 0; pos < 5; pos++) {
+                    const charCode = sol.charCodeAt(pos) - 97;
+                    if (charCode >= 0 && charCode < 26) {
+                        globalCounts[charCode]++;
+                    }
+                }
+            }
+
+            let score = 0;
+            const seenLetters = new Set();
+            
+            for (let pos = 0; pos < 5; pos++) {
+                const char = word[pos];
+                const charCode = char.charCodeAt(0) - 97;
+                
+                if (charCode >= 0 && charCode < 26) {
+                    if (!seenLetters.has(char)) {
+                        score += globalCounts[charCode];
+                        seenLetters.add(char);
+                    }
+                }
+            }
+            return score;
+        }
+
+        function simulateTreeDepth(guess, currentPool, evaluationPool, turnsLeft) {
+            let localBuckets = {};
+            for (let i = 0; i < currentPool.length; i++) {
+                const sol = currentPool[i];
+                const code = calculateFeedbackPattern(guess, sol);
+                if (!localBuckets[code]) localBuckets[code] = [];
+                localBuckets[code].push(sol);
+            }
+
+            let maxTurnsRequired = 1;
+
+            for (const code in localBuckets) {
+                const subPool = localBuckets[code];
+                if (code == 242) continue; 
+
+                if (subPool.length === 1) {
+                    maxTurnsRequired = Math.max(maxTurnsRequired, 2);
+                    continue;
+                }
+
+                if (turnsLeft <= 1) {
+                    return 99; 
+                }
+
+                let minSubMaxCost = 99;
+                for (let j = 0; j < evaluationPool.length; j++) {
+                    const nextGuess = evaluationPool[j];
+                    
+                    if (subPool.length > 0) {
+                        if (calculateFeedbackPattern(guess, nextGuess) !== parseInt(code)) continue;
+                    }
+
+                    let subBuckets = {};
+                    for (let k = 0; k < subPool.length; k++) {
+                        const s = subPool[k];
+                        const c = calculateFeedbackPattern(nextGuess, s);
+                        subBuckets[c] = (subBuckets[c] || 0) + 1;
+                    }
+
+                    let branchWorst = 0;
+                    for (const c in subBuckets) {
+                        if (c == 242) continue;
+                        branchWorst = Math.max(branchWorst, subBuckets[c]);
+                    }
+
+                    let cost = 2; 
+                    if (branchWorst > 0) {
+                        cost += 1;
+                        if (branchWorst > 1) cost += 1; 
+                    }
+
+                    if (cost < minSubMaxCost) {
+                        minSubMaxCost = cost;
+                    }
+                    if (minSubMaxCost <= 2) break; 
+                }
+
+                maxTurnsRequired = Math.max(maxTurnsRequired, minSubMaxCost);
+            }
+
+            return maxTurnsRequired;
+        }
+
         function filterPool(solutionsPool, guess, exactPatternCode) {
             return solutionsPool.filter(sol => calculateFeedbackPattern(guess, sol) === exactPatternCode);
         }
@@ -293,7 +414,7 @@
             analyticsMetricsGroup.classList.remove('hidden');
             candidatesContainerCard.classList.remove('hidden');
 
-            statusBadge.innerText = "Analyzing Strategy...";
+            statusBadge.innerText = "Analyzing Deep Matrix Tree...";
             statusBadge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 tracking-wide uppercase";
 
             setTimeout(() => {
@@ -303,6 +424,7 @@
                     instructionText.innerHTML = `Absolute solution confirmed. Play <strong class="text-emerald-400">${target}</strong> to complete the matrix.`;
                     poolCountDisplay.innerText = "1";
                     worstCaseDisplay.innerText = "1";
+                    metricsSubtext.innerText = "Turn depth guaranteed";
                     candidateList.innerHTML = `<div class="text-sm bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl text-emerald-400 font-semibold flex justify-between"><span>${target}</span><span>Target Lock</span></div>`;
                     statusBadge.innerText = "Solved";
                     statusBadge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 tracking-wide uppercase";
@@ -310,53 +432,84 @@
                 }
 
                 const remainingTurns = maxTurns - currentTurn;
+                const useDeepTree = W_sol.length <= 8; 
 
                 let evaluationPool = W_sol;
-                // Only look for compliant burner items if we actually have turns left to spend information
-                if (remainingTurns > 1 && W_sol.length <= 150 && W_all.length > 0) {
-                    const prevTurnIdx = currentTurn - 1;
-                    let lastGuess = "";
-                    let lastPatternCode = 0;
-                    for (let c = 0; c < wordLength; c++) {
-                        lastGuess += matrixState[prevTurnIdx][c].letter;
-                        lastPatternCode += matrixState[prevTurnIdx][c].color * Math.pow(3, 4 - c);
-                    }
-                    evaluationPool = W_all.filter(word => calculateFeedbackPattern(lastGuess, word) === lastPatternCode);
+                const prevTurnIdx = currentTurn - 1;
+                let lastGuess = "";
+                let lastPatternCode = 0;
+                for (let c = 0; c < wordLength; c++) {
+                    lastGuess += matrixState[prevTurnIdx][c].letter;
+                    lastPatternCode += matrixState[prevTurnIdx][c].color * Math.pow(3, 4 - c);
                 }
+                
+                evaluationPool = W_all.filter(word => calculateFeedbackPattern(lastGuess, word) === lastPatternCode);
 
                 let rankings = [];
                 const limit = evaluationPool.length;
+                let absoluteMinTreeCostFound = 99;
 
                 for (let i = 0; i < limit; i++) {
                     const word = evaluationPool[i];
                     const metrics = evaluateWordMetrics(word, W_sol);
                     const isViableSolution = W_sol.includes(word);
+                    
+                    // UPDATE 2: Track Positional and Global structural weights
+                    const positionalScore = calculatePositionalScore(word, W_sol);
+                    const globalScore = calculateGlobalScore(word, W_sol);
+
+                    let treeDepthCost = 0;
+                    if (useDeepTree) {
+                        treeDepthCost = simulateTreeDepth(word, W_sol, evaluationPool, remainingTurns);
+                        if (treeDepthCost < absoluteMinTreeCostFound) {
+                            absoluteMinTreeCostFound = treeDepthCost;
+                        }
+                    }
 
                     rankings.push({ 
                         word, 
                         maxBucket: metrics.maxBucketSize, 
                         entropy: metrics.entropy,
-                        isSol: isViableSolution
+                        isSol: isViableSolution,
+                        treeCost: treeDepthCost,
+                        posScore: positionalScore,
+                        globalScore: globalScore
                     });
                 }
 
+                const pathIsUnwinnable = useDeepTree && (absoluteMinTreeCostFound > remainingTurns);
+
+                // UPDATE 3: Fully Comprehensive Hierarchical Sorting Core
                 rankings.sort((a, b) => {
-                    // CRITICAL HARD-MODE ENDGAME OVERRIDE:
-                    // If this is our final guess block, sorting parameters prioritizing burner items is suicidal.
-                    // Force actual remaining solution hits to match 100% urgency weights.
-                    if (remainingTurns === 1) {
+                    // FALLBACK STATE (Unwinnable traps or final guess scenario)
+                    if (pathIsUnwinnable || remainingTurns === 1) {
                         if (a.isSol !== b.isSol) return b.isSol - a.isSol;
+                        if (b.entropy !== a.entropy) return b.entropy - a.entropy; 
+                        if (a.maxBucket !== b.maxBucket) return a.maxBucket - b.maxBucket; 
+                        if (b.posScore !== a.posScore) return b.posScore - a.posScore;
+                        if (b.globalScore !== a.globalScore) return b.globalScore - a.globalScore; // Global Letter Tie-Breaker
+                        return 0;
                     }
+
+                    // STANDARD WINNABLE STATE
+                    if (useDeepTree) {
+                        if (a.treeCost !== b.treeCost) return a.treeCost - b.treeCost;
+                    }
+                    
                     if (a.maxBucket !== b.maxBucket) return a.maxBucket - b.maxBucket;
-                    if (b.entropy !== a.entropy) return b.entropy - a.entropy;
-                    return b.isSol - a.isSol;
+                    if (b.entropy !== a.entropy) return b.entropy - a.entropy; 
+                    if (a.isSol !== b.isSol) return b.isSol - a.isSol;
+                    if (b.posScore !== a.posScore) return b.posScore - a.posScore;
+                    if (b.globalScore !== a.globalScore) return b.globalScore - a.globalScore; // Global Letter Tie-Breaker
+                    
+                    return 0;
                 });
 
-                renderRankings(rankings.slice(0, 20));
+                renderRankings(rankings.slice(0, 20), useDeepTree, pathIsUnwinnable);
             }, 30);
         }
 
-        function renderRankings(topRankings) {
+        function renderRankings(topRankings, showingTreeDepth, pathIsUnwinnable) {
             if (topRankings.length === 0) return;
 
             const absoluteBest = topRankings[0];
@@ -364,11 +517,29 @@
             
             optimalGuessDisplay.innerText = bestWordUpper;
             poolCountDisplay.innerText = W_sol.length.toLocaleString();
-            worstCaseDisplay.innerText = absoluteBest.maxBucket;
+            
+            if (showingTreeDepth) {
+                worstCaseDisplay.innerText = absoluteBest.treeCost;
+                metricsSubtext.innerText = "Max turns to clear entire tree";
+                
+                if (pathIsUnwinnable) {
+                    worstCaseDisplay.className = "text-2xl font-bold text-rose-500 heading-font";
+                } else {
+                    worstCaseDisplay.className = "text-2xl font-bold text-emerald-400 heading-font";
+                }
+            } else {
+                worstCaseDisplay.innerText = absoluteBest.maxBucket;
+                metricsSubtext.innerText = "Max cluster size group";
+                worstCaseDisplay.className = "text-2xl font-bold text-amber-400 heading-font";
+            }
             
             const remainingTurns = maxTurns - currentTurn;
             if (remainingTurns === 1) {
                 instructionText.innerHTML = `CRITICAL TURN! Play <strong class="text-rose-400 tracking-wider">${bestWordUpper}</strong>. Information splits are useless now; you must attempt to direct-hit a remaining pool solution.`;
+            } else if (pathIsUnwinnable) {
+                instructionText.innerHTML = `Trap Bottleneck Flagged! Strict victory is mathematically impossible in <span class="text-rose-400 font-semibold">${remainingTurns}</span> turns. Pivot to entropy fallback <strong class="text-amber-400 tracking-wider">${bestWordUpper}</strong> to maximize structural layout patterns.`;
+            } else if (showingTreeDepth) {
+                instructionText.innerHTML = `Bottleneck Alert! Deep simulation recommends <strong class="text-emerald-400 tracking-wider">${bestWordUpper}</strong>. This selection clears the entire path in a maximum of <span class="text-amber-400 font-semibold">${absoluteBest.treeCost}</span> total moves.`;
             } else {
                 instructionText.innerHTML = `Play <strong class="text-violet-400 tracking-wider">${bestWordUpper}</strong>. In the absolute worst-case scenario, this choice keeps your remaining possibilities capped at a maximum of <span class="text-amber-400 font-semibold">${absoluteBest.maxBucket}</span> choices.`;
             }
@@ -383,22 +554,37 @@
                     : 'bg-amber-500/10 text-amber-400 border border-amber-500/10';
                 const badgeText = cand.isSol ? 'Sol' : 'Burn';
 
+                let subMetricDisplay = "";
+                if (pathIsUnwinnable) {
+                    subMetricDisplay = `E: ${cand.entropy.toFixed(2)} | P: ${cand.posScore} | G: ${cand.globalScore}`;
+                } else if (showingTreeDepth) {
+                    subMetricDisplay = `T: ${cand.treeCost} | E: ${cand.entropy.toFixed(2)} | P: ${cand.posScore} | G: ${cand.globalScore}`;
+                } else {
+                    subMetricDisplay = `Pk: ${cand.maxBucket} | E: ${cand.entropy.toFixed(2)} | P: ${cand.posScore} | G: ${cand.globalScore}`;
+                }
+
                 div.innerHTML = `
                     <div class="flex items-center space-x-3">
                         <span class="text-gray-500 font-mono text-xs w-4">${idx + 1}</span>
                         <span class="font-bold tracking-wider text-white uppercase">${cand.word}</span>
                         <span class="text-[10px] px-2 py-0.5 rounded ${badgeClass} font-medium">${badgeText}</span>
                     </div>
-                    <div class="font-mono text-xs text-gray-400">Worst Case Peak: ${cand.maxBucket} words</div>
+                    <div class="font-mono text-xs text-gray-400">${subMetricDisplay}</div>
                 `;
                 div.addEventListener('click', () => populateActiveRow(cand.word));
                 candidateList.appendChild(div);
             });
 
-            statusBadge.innerText = remainingTurns === 1 ? "Final Guess Warning" : "Ready";
-            statusBadge.className = remainingTurns === 1 
-                ? "text-xs font-semibold px-3 py-1.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 tracking-wide uppercase animate-pulse"
-                : "text-xs font-semibold px-3 py-1.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 tracking-wide uppercase";
+            if (remainingTurns === 1) {
+                statusBadge.innerText = "Final Guess Warning";
+                statusBadge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 tracking-wide uppercase animate-pulse";
+            } else if (pathIsUnwinnable) {
+                statusBadge.innerText = "Entropy Emergency Mode";
+                statusBadge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 tracking-wide uppercase animate-pulse";
+            } else {
+                statusBadge.innerText = "Ready";
+                statusBadge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 tracking-wide uppercase";
+            }
         }
 
         function populateActiveRow(word) {
@@ -455,7 +641,7 @@
                 statusBadge.className = "text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-500 text-black tracking-wide uppercase";
                 optimalGuessDisplay.innerText = compiledGuess.toUpperCase();
                 instructionText.innerHTML = "Puzzle solved successfully!";
-                currentTurn = maxTurns; // Halts input triggers cleanly
+                currentTurn = maxTurns; 
                 return;
             }
 
